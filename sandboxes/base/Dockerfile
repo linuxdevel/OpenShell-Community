@@ -73,7 +73,7 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
 RUN npm install -g \
         tar@7.5.11 \
         @hono/node-server@1.19.11 \
-        opencode-ai@1.2.18 \
+        opencode-ai@1.3.0 \
         @openai/codex@0.111.0
 
 # GitHub CLI
@@ -110,6 +110,14 @@ ENV PATH="/sandbox/.venv/bin:/usr/local/bin:/usr/bin:/bin" \
 
 # Default sandbox network / filesystem policy
 COPY policy.yaml /etc/openshell/policy.yaml
+
+# Managed opencode configuration (highest-priority, read-only for sandbox user).
+# /etc/opencode/ is the enterprise managed config directory that opencode reads
+# on startup.  Landlock marks /etc as read-only, so the agent running as the
+# sandbox user cannot modify its own model selection or other managed settings.
+# User-writable config (~/.config/opencode/) still handles plugin installation
+# (node_modules, bun.lock) but cannot override values set here.
+COPY opencode.json /etc/opencode/opencode.json
 
 # Copy custom skills into the image.
 # To add a skill, create a subdirectory under sandboxes/base/skills/

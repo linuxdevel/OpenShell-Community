@@ -155,6 +155,21 @@ network_policies:
       port: 443
     - host: integrate.api.nvidia.com
       port: 443
+    # opencode startup check / model registry
+    - host: models.dev
+      port: 443
+    # GitHub Copilot runtime: token exchange + chat completions
+    - host: api.github.com
+      port: 443
+    - host: api.githubcopilot.com
+      port: 443
+    # Plugin installation from git+https (superpowers, etc.)
+    - host: github.com
+      port: 443
+    - host: raw.githubusercontent.com
+      port: 443
+    - host: objects.githubusercontent.com
+      port: 443
     binaries:
     - path: /usr/lib/node_modules/opencode-ai/bin/.opencode
     - path: /usr/bin/node

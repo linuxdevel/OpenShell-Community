@@ -9,6 +9,8 @@
 
 This repo is the community ecosystem around OpenShell -- a hub for contributed skills, sandbox images, launchables, and integrations that extend its capabilities. For the core engine, docs, and published artifacts (PyPI, containers, binaries), see the [OpenShell](https://github.com/NVIDIA/OpenShell) repo.
 
+In the coordinated fork-owned supply chain, this repo owns sandbox/base image behavior and packaged tool environments. It is expected to publish the reproducible images that `OpenShell/` later consumes for sandboxed tool flows such as `claude code`, `opencode`, and future adapters. This repo does not own the final installer or cluster orchestration layer.
+
 > Alpha software — single-player mode. OpenShell is proof-of-life: one developer, one environment, one gateway. We are building toward multi-tenant enterprise deployments, but the starting point is getting your own environment up and running. Expect rough edges. Bring your agent.
 
 ## What's Here
@@ -26,6 +28,17 @@ This repo is the community ecosystem around OpenShell -- a hub for contributed s
 | `sandboxes/ollama/`     | Ollama for local and cloud LLMs with Claude Code, Codex, OpenCode pre-installed |
 | `sandboxes/sdg/`        | Synthetic data generation workflows                          |
 | `sandboxes/openclaw/`   | OpenClaw -- open agent manipulation and control              |
+
+## Role In The Install Chain
+
+The higher-level install path is shared across the four coordinated repos:
+
+- `libnvidia-container/` provides low-level GPU library outputs.
+- `nvidia-container-toolkit/` provides the reusable runtime-bundle release assets.
+- `OpenShell-Community/` provides sandbox/base images and packaged tool environments.
+- `OpenShell/` composes those artifacts into the currently expected final setup/install UX.
+
+That split keeps this repo focused on image and tool-environment ownership instead of turning it into a second orchestration or installer repo.
 
 ## Getting Started
 
