@@ -24,10 +24,13 @@ The foundational sandbox image that all other OpenShell Community sandbox images
 
 ```
 /sandbox/                  # Home directory (sandbox user)
-  .bashrc, .profile        # Shell init (PATH, VIRTUAL_ENV, UV_PYTHON_INSTALL_DIR)
-  .venv/                   # Writable Python venv (pip install, uv pip install)
-  .agents/skills/          # Agent skill discovery
-  .claude/skills/          # Claude skill discovery (symlinked from .agents/skills)
+  .bashrc, .profile        # Root-owned shell init, readable but not writable
+  .bash_history            # Sandbox-user shell history
+  .venv/                   # Root-owned seeded Python venv on PATH
+  .agents/skills/          # Root-owned agent skill discovery
+  .claude/skills/          # Root-owned Claude skill discovery (symlinked from .agents/skills)
+  .config/opencode/        # Writable opencode home
+  .config/opencode/plugins # Root-owned baked plugin tree
 ```
 
 ### Skills
@@ -37,6 +40,14 @@ The base image ships with the following agent skills:
 | Skill | Description |
 |-------|-------------|
 | `github` | REST-only GitHub CLI usage guide (GraphQL is blocked in sandboxes) |
+
+## Hardening Defaults
+
+- `/etc/opencode/opencode.json` is the managed opencode config and is read-only to the sandbox user.
+- `/sandbox/.config/opencode/plugins/` is baked into the image and locked `root:root` so the agent cannot rewrite plugin code or plugin-provided skills at runtime.
+- `/sandbox/.agents/` and `/sandbox/.claude/` are locked `root:root` so baked skill instructions stay immutable.
+- `/sandbox/.bashrc` and `/sandbox/.profile` are locked `root:root`; `/sandbox/.bash_history` remains writable by `sandbox`.
+- `/sandbox/.venv/` is baked and locked `root:root` so `/sandbox/.venv/bin` cannot be used for PATH hijacking.
 
 ## Build
 

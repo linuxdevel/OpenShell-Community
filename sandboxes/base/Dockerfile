@@ -101,12 +101,17 @@ RUN uv python install 3.13 && \
 # Final base image
 FROM devtools AS final
 
-# Add venvs to PATH -- /sandbox/.venv (writable, user-installed packages)
-# takes priority over system paths.
+# Add venvs to PATH.
+# /sandbox/.venv/bin stays in PATH for the seeded Python environment, but the
+# venv is baked into the image and later locked read-only to prevent PATH
+# hijacking by the sandbox user.
 # VIRTUAL_ENV and UV_PYTHON_INSTALL_DIR are also exported in .bashrc
 # so that login shell sessions (interactive and exec) see them.
 ENV PATH="/sandbox/.venv/bin:/usr/local/bin:/usr/bin:/bin" \
     VIRTUAL_ENV="/sandbox/.venv"
+
+ARG SUPERPOWERS_REPO=https://github.com/obra/superpowers.git
+ARG SUPERPOWERS_COMMIT=8ea39819eed74fe2a0338e71789f06b30e953041
 
 # Default sandbox network / filesystem policy
 COPY policy.yaml /etc/openshell/policy.yaml
@@ -115,8 +120,9 @@ COPY policy.yaml /etc/openshell/policy.yaml
 # /etc/opencode/ is the enterprise managed config directory that opencode reads
 # on startup.  Landlock marks /etc as read-only, so the agent running as the
 # sandbox user cannot modify its own model selection or other managed settings.
-# User-writable config (~/.config/opencode/) still handles plugin installation
-# (node_modules, bun.lock) but cannot override values set here.
+# Plugin assets are baked into the image and locked down separately under
+# ~/.config/opencode/plugins/ so the sandbox user cannot rewrite its own plugin
+# instructions at runtime.
 COPY opencode.json /etc/opencode/opencode.json
 
 # Copy custom skills into the image.
@@ -126,14 +132,18 @@ COPY opencode.json /etc/opencode/opencode.json
 COPY skills/ /sandbox/.agents/skills/
 
 # Set up sandbox user home directory
-RUN mkdir -p /sandbox/.claude/skills && \
-    # Create a writable venv using uv-managed Python 3.13.
-    # Sandbox users can `uv pip install` (or `pip install`) into
-    # this venv without touching the base image layer.
+RUN mkdir -p /sandbox/.claude/skills /sandbox/.config/opencode/plugins && \
+    git clone --depth 1 ${SUPERPOWERS_REPO} /sandbox/.config/opencode/plugins/superpowers && \
+    git -C /sandbox/.config/opencode/plugins/superpowers fetch --depth 1 origin ${SUPERPOWERS_COMMIT} && \
+    git -C /sandbox/.config/opencode/plugins/superpowers checkout --detach ${SUPERPOWERS_COMMIT} && \
+    ln -sf /sandbox/.config/opencode/plugins/superpowers/.opencode/plugins/superpowers.js \
+        /sandbox/.config/opencode/plugins/superpowers.js && \
+    # Create a seeded venv using uv-managed Python 3.13.
+    # The venv is intentionally locked read-only later so /sandbox/.venv/bin
+    # cannot be used for PATH hijacking by the sandbox user.
     uv venv --python 3.13 --seed /sandbox/.venv && \
     uv pip install --python /sandbox/.venv/bin/python cloudpickle && \
     uv cache clean && \
-    chown -R sandbox:sandbox /sandbox/.venv && \
     # Minimal shell init files so interactive and non-interactive shells
     # get a sane PATH and prompt.  Without these, bash sources nothing
     # under /sandbox and tools like VS Code Remote-SSH may mis-detect
@@ -141,13 +151,18 @@ RUN mkdir -p /sandbox/.claude/skills && \
     printf 'export PATH="/sandbox/.venv/bin:/usr/local/bin:/usr/bin:/bin"\nexport VIRTUAL_ENV="/sandbox/.venv"\nexport UV_PYTHON_INSTALL_DIR="/sandbox/.uv/python"\nexport PS1="\\u@\\h:\\w\\$ "\n' \
         > /sandbox/.bashrc && \
     printf '[ -f ~/.bashrc ] && . ~/.bashrc\n' > /sandbox/.profile && \
-    chown sandbox:sandbox /sandbox/.bashrc /sandbox/.profile && \
+    touch /sandbox/.bash_history && \
     # Symlink skills into agent discovery directories
     for skill in /sandbox/.agents/skills/*/; do \
         [ -d "$skill" ] || continue; \
         ln -sf "$skill" "/sandbox/.claude/skills/$(basename "$skill")"; \
     done && \
-    chown -R sandbox:sandbox /sandbox/.claude /sandbox/.agents /sandbox
+    chown sandbox:sandbox /sandbox /sandbox/.bash_history /sandbox/.config /sandbox/.config/opencode && \
+    chmod 600 /sandbox/.bash_history && \
+    chown -R root:root /sandbox/.venv /sandbox/.claude /sandbox/.agents /sandbox/.config/opencode/plugins /sandbox/.bashrc /sandbox/.profile && \
+    find /sandbox/.venv /sandbox/.claude /sandbox/.agents /sandbox/.config/opencode/plugins -type d -exec chmod 755 {} + && \
+    find /sandbox/.venv /sandbox/.claude /sandbox/.agents /sandbox/.config/opencode/plugins -type f -exec chmod 644 {} + && \
+    chmod 644 /sandbox/.bashrc /sandbox/.profile
 
 USER sandbox
 
